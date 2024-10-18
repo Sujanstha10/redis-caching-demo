@@ -1,3 +1,4 @@
+const { default: axios } = require("axios");
 const express = require("express");
 const app = express();
 const redis = require("redis");
@@ -30,8 +31,21 @@ const redis = require("redis");
   console.log("Redis connected");
 })();
 
-app.get("/", (req, res) => {
-  res.send("Redis is all set");
+app.get("/", async (req, res) => {
+  try {
+    const cachedData = await redisClient.get("todoData");
+    if (cachedData) {
+      return res.json(JSON.parse(cachedData));
+    }
+    const response = await axios.get(
+      "https://jsonplaceholder.typicode.com/todos"
+    );
+    const data = response.data;
+    await redisClient.set("todoData", JSON.stringify(data));
+    return res.json(data);
+  } catch (err) {
+    console.error(err);
+  }
 });
 
 app.listen(3000, () => {
@@ -45,14 +59,14 @@ app.get("/count", async (req, res) => {
     // If no data is found, cachedData will be null
     let cachedData = await redisClient.get("data");
     if (cachedData) {
-      return res.json(cachedData);
+      return res.json({ count: cachedData });
     }
     for (let i = 0; i < 10000000000; i++) {
       data = +i;
     }
     // Store new data in Redis with the key "data" for future access
     await redisClient.set("data", data);
-    return res.json(data);
+    return res.json({ count: data });
   } catch (error) {
     return res.json(error);
   }
